@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Photo Gallery</title>
+    <title>My Photo Gallery – Click to Fullscreen</title>
     <style>
         * {
             margin: 0;
@@ -48,13 +48,52 @@
             transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
         }
 
-        /* Hover zoom effect */
+        /* Small hover zoom (still works) */
         .gallery-item:hover img {
             transform: scale(1.08);
         }
 
         .gallery-item:hover {
             box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        /* Modal (full-screen overlay) */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: monospace;
+            z-index: 1001;
+        }
+
+        .close-modal:hover {
+            color: #ccc;
         }
 
         @media (max-width: 640px) {
@@ -65,22 +104,39 @@
                 gap: 1rem;
                 grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             }
+            .close-modal {
+                top: 10px;
+                right: 20px;
+                font-size: 35px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1 class="gallery-title">📸 My Photo Gallery</h1>
+    <h1 class="gallery-title">Exploration of Outside Drinking Habits</h1>
     <div class="gallery-grid" id="gallery"></div>
+
+    <!-- Modal for full-size images -->
+    <div id="imageModal" class="modal">
+        <span class="close-modal">&times;</span>
+        <img id="modalImage" src="" alt="Full size">
+    </div>
 
     <script>
         // List all your photo filenames from 1.jpg to 33.jpg
         const photos = [];
         for (let i = 1; i <= 33; i++) {
             photos.push("drinking-culture/" + i + ".jpg");
+            // If your photos are inside a folder called "gallery", use:
+            // photos.push("gallery/" + i + ".jpg");
         }
 
         const galleryDiv = document.getElementById('gallery');
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImage');
+        const closeModal = document.querySelector('.close-modal');
 
+        // Create thumbnail gallery
         photos.forEach(photo => {
             const item = document.createElement('div');
             item.className = 'gallery-item';
@@ -90,6 +146,24 @@
             img.loading = 'lazy';
             item.appendChild(img);
             galleryDiv.appendChild(item);
+
+            // Click on thumbnail -> open modal with full image
+            item.addEventListener('click', function() {
+                modal.style.display = 'flex';
+                modalImg.src = photo;
+            });
+        });
+
+        // Close modal when clicking the X button
+        closeModal.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+
+        // Close modal when clicking the dark background
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
         });
     </script>
 </body>
