@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Photo Gallery – Click to Fullscreen</title>
+    <title>Silhouette Gallery – Drunkards' Cheer</title>
     <style>
         * {
             margin: 0;
@@ -15,49 +15,70 @@
             background: #0f172a;
             font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
             padding: 2rem;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .gallery-wrapper {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border-radius: 2rem;
+            padding: 1rem;
         }
 
         .gallery-title {
             text-align: center;
-            color: #f1f5f9;
-            margin-bottom: 2rem;
+            color: #ffd966;
+            margin-bottom: 0.5rem;
             font-size: 2rem;
         }
 
-        .gallery-grid {
+        .sub {
+            text-align: center;
+            color: #ccc;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .silhouette-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1.5rem;
-            max-width: 1200px;
+            justify-content: center;
             margin: 0 auto;
         }
 
-        .gallery-item {
+        .grid-cell {
+            position: relative;
             background: #1e293b;
-            border-radius: 1rem;
-            overflow: hidden;
-            transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
         }
 
-        .gallery-item img {
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            object-fit: cover;
+        .grid-cell img {
             display: block;
-            transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.2), box-shadow 0.2s;
         }
 
-        /* Small hover zoom (still works) */
-        .gallery-item:hover img {
-            transform: scale(1.08);
+        .grid-cell:hover {
+            z-index: 10;
+        }
+        .grid-cell:hover img {
+            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
         }
 
-        .gallery-item:hover {
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        .grid-cell.empty {
+            background: transparent;
+            cursor: default;
+        }
+        .grid-cell.empty img {
+            display: none;
         }
 
-        /* Modal (full-screen overlay) */
         .modal {
             display: none;
             position: fixed;
@@ -96,13 +117,22 @@
             color: #ccc;
         }
 
+        .loading {
+            text-align: center;
+            color: white;
+            padding: 2rem;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: #aaa;
+            font-size: 0.7rem;
+        }
+
         @media (max-width: 640px) {
             body {
                 padding: 1rem;
-            }
-            .gallery-grid {
-                gap: 1rem;
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             }
             .close-modal {
                 top: 10px;
@@ -113,58 +143,161 @@
     </style>
 </head>
 <body>
-    <h1 class="gallery-title">Exploration of Outside Drinking Habits</h1>
-    <div class="gallery-grid" id="gallery"></div>
+<div class="gallery-wrapper">
+    <div class="gallery-title">🍻 Drunkards' Cheer 🍻</div>
+    <div class="sub">click any photo → full size | photos fill the silhouette</div>
+    <div id="silhouetteContainer" class="loading">Loading silhouette & photos...</div>
+    <footer>Photos repeat if needed – no clipping, no distortion. Add more real photos later.</footer>
+</div>
 
-    <!-- Modal for full-size images -->
-    <div id="imageModal" class="modal">
-        <span class="close-modal">&times;</span>
-        <img id="modalImage" src="" alt="Full size">
-    </div>
+<div id="imageModal" class="modal">
+    <span class="close-modal">&times;</span>
+    <img id="modalImage" src="" alt="Full size">
+</div>
 
-    <script>
-        // List all your photo filenames from 1.jpg to 33.jpg
-        const photos = [];
-        for (let i = 1; i <= 33; i++) {
-            photos.push("drinking-culture/" + i + ".jpg");
-            // If your photos are inside a folder called "gallery", use:
-            // photos.push("gallery/" + i + ".jpg");
-        }
+<script>
+    // ========================
+    // USER CONFIGURATION – EDIT THESE
+    // ========================
+    const SILHOUETTE_URL = "silhouette.png";   // place this file next to index.html
+    const PHOTO_FOLDER = "";                   // leave empty if photos are in same folder as index.html
+                                               // if photos are inside "gallery/", write "gallery/"
+    const PHOTO_EXTENSION = ".jpg";            // change to ".png" if needed
+    const TOTAL_PHOTOS = 33;                   // number of photos (1.jpg to 33.jpg)
 
-        const galleryDiv = document.getElementById('gallery');
-        const modal = document.getElementById('imageModal');
-        const modalImg = document.getElementById('modalImage');
-        const closeModal = document.querySelector('.close-modal');
+    // TARGET GRID DENSITY – start with 20, then increase for more detail (24, 28...)
+    // Higher = more cells = better silhouette but more photo repetition
+    const TARGET_COLS = 20;                    // good balance for 33 photos
 
-        // Create thumbnail gallery
-        photos.forEach(photo => {
-            const item = document.createElement('div');
-            item.className = 'gallery-item';
-            const img = document.createElement('img');
-            img.src = photo;
-            img.alt = 'Gallery image';
-            img.loading = 'lazy';
-            item.appendChild(img);
-            galleryDiv.appendChild(item);
+    // ========================
+    // DO NOT EDIT BELOW (unless you know what you're doing)
+    // ========================
+    const container = document.getElementById("silhouetteContainer");
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    const closeModal = document.querySelector('.close-modal');
 
-            // Click on thumbnail -> open modal with full image
-            item.addEventListener('click', function() {
-                modal.style.display = 'flex';
-                modalImg.src = photo;
-            });
+    function loadImage(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error(`Failed to load ${url}`));
+            img.src = url;
         });
+    }
 
-        // Close modal when clicking the X button
-        closeModal.addEventListener('click', function() {
-            modal.style.display = 'none';
-        });
+    async function buildSilhouetteGallery() {
+        try {
+            const silhouetteImg = await loadImage(SILHOUETTE_URL);
+            const origWidth = silhouetteImg.width;
+            const origHeight = silhouetteImg.height;
+            const aspect = origWidth / origHeight;
 
-        // Close modal when clicking the dark background
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                modal.style.display = 'none';
+            let gridCols = TARGET_COLS;
+            let gridRows = Math.round(gridCols / aspect);
+            if (gridRows < 1) gridRows = 1;
+
+            console.log(`Silhouette ${origWidth}x${origHeight}, aspect ${aspect.toFixed(2)} → grid ${gridCols}x${gridRows}`);
+
+            // Load all photos
+            const photoImages = [];
+            for (let i = 1; i <= 33; i++) {
+                const filename = "drinking-culture" + i + ".jpg";
+                try {
+                    const img = await loadImage(filename);
+                    photoImages.push(img);
+                } catch(e) {
+                    console.warn(`Could not load ${filename}`);
+                }
             }
-        });
-    </script>
+
+            if (photoImages.length === 0) {
+                container.innerHTML = '<div class="loading">❌ No photos loaded. Check filenames and folder.</div>';
+                return;
+            }
+
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = gridCols;
+            canvas.height = gridRows;
+            ctx.drawImage(silhouetteImg, 0, 0, gridCols, gridRows);
+
+            const insideCells = [];
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    const pixel = ctx.getImageData(col, row, 1, 1).data;
+                    const r = pixel[0], g = pixel[1], b = pixel[2], a = pixel[3];
+                    const isInside = (a !== 0) && (r + g + b) < 100;
+                    if (isInside) insideCells.push({ row, col });
+                }
+            }
+
+            if (insideCells.length === 0) {
+                container.innerHTML = '<div class="loading">⚠️ No shape detected. Make sure silhouette.png has black areas.</div>';
+                return;
+            }
+
+            const totalCells = insideCells.length;
+            const totalPhotos = photoImages.length;
+
+            const gridDiv = document.createElement("div");
+            gridDiv.className = "silhouette-grid";
+            gridDiv.style.display = "grid";
+            gridDiv.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+            gridDiv.style.aspectRatio = `${gridCols} / ${gridRows}`;
+
+            const cellInside = Array(gridRows).fill().map(() => Array(gridCols).fill(false));
+            insideCells.forEach(({row, col}) => { cellInside[row][col] = true; });
+
+            let photoIndex = 0;
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    const cell = document.createElement("div");
+                    cell.className = "grid-cell";
+                    if (!cellInside[row][col]) {
+                        cell.classList.add("empty");
+                        gridDiv.appendChild(cell);
+                        continue;
+                    }
+                    const img = photoImages[photoIndex % totalPhotos];
+                    const imgElement = document.createElement("img");
+                    imgElement.src = img.src;
+                    imgElement.alt = `photo ${photoIndex+1}`;
+                    cell.appendChild(imgElement);
+                    cell.addEventListener('click', (function(src) {
+                        return () => {
+                            modal.style.display = 'flex';
+                            modalImg.src = src;
+                        };
+                    })(img.src));
+                    gridDiv.appendChild(cell);
+                    photoIndex++;
+                }
+            }
+
+            container.innerHTML = "";
+            container.appendChild(gridDiv);
+
+            if (totalCells > totalPhotos) {
+                const note = document.createElement("div");
+                note.style.textAlign = "center";
+                note.style.marginTop = "1rem";
+                note.style.color = "#ffaa66";
+                note.style.fontSize = "0.8rem";
+                note.innerText = `✨ ${totalCells} cells inside silhouette, ${totalPhotos} photos. Photos repeat to fill shape. No clipping, no distortion.`;
+                container.appendChild(note);
+            }
+        } catch (err) {
+            console.error(err);
+            container.innerHTML = `<div class="loading">❌ Error: ${err.message}. Check silhouette.png and photo files exist.</div>`;
+        }
+    }
+
+    closeModal.addEventListener('click', () => { modal.style.display = 'none'; });
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+    buildSilhouetteGallery();
+</script>
 </body>
 </html>
